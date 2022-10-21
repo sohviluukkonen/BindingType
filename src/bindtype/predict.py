@@ -13,7 +13,6 @@ def BindingTypeClassifier(data = None, data_path : str = None, output_path : str
         raise ValueError('No data provided. Provide either data or data_path')
     
     # Get descriptors
-    data = pd.read_csv(data_path, sep='\t')
     pairs = [ (smiles, target) for smiles, target in zip(data['canonical_smiles'], data['accession']) ]
     x = getDescriptors(
         pairs, 
