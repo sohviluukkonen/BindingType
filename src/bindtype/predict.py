@@ -4,9 +4,14 @@ import sklearn_json as skljson
 
 from .descriptors import getDescriptors
 
-def BindingTypeClassifier(data_path : str, output_path : str = None):
+def BindingTypeClassifier(data = None, data_path : str = None, output_path : str = None):
     """Predict binding type (allo- or orthosteric) of given molecule-protein pairs."""
 
+    if data_path:
+        data = pd.read_csv(data_path, sep='\t')
+    elif data is None:
+        raise ValueError('No data provided. Provide either data or data_path')
+    
     # Get descriptors
     data = pd.read_csv(data_path, sep='\t')
     pairs = [ (smiles, target) for smiles, target in zip(data['canonical_smiles'], data['accession']) ]
