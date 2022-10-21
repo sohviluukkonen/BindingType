@@ -21,9 +21,9 @@ Parse abstracts from a list of PMIDs:
     doc_ids = [ PMID:15743197, PMID:18307293, PMID:20095623]
     binding_types = annotate.parse_abstracts(document_ids=doc_ids)
 
-Parse abstracts from a .tsv file with PMIDs in `doc_id` columns and save to file:
+Parse abstracts from a .tsv file with PMIDs in `doc_id` columns and save to file .json-file:
 
-    annotate.parse_abstracts(from_file='data/AdenosinePMID.tsv', out_file='AdenosinesBindingTypes.tsv')
+    annotate.parse_abstracts(from_file='data/pmids.tsv', out_file='binding_types.json')
 
 Parse PDFs (named PMID:XXXXXX.pdf) in a folder:
     binding_type = annotate.parse_pdfs(input_folder='data/PDFs')
@@ -61,4 +61,4 @@ Proteins features are described by 8 physico-chemical descriptors per residue fr
 |----------|--------------|---------------|------|------|
 | 0.85     | 0.68         | 0.93          | 0.64 | 0.88 |
 
-*hit rate of allosteric sites, **hite rate of orthosteric sites
+*hit rate of allosteric compounds, **hite rate of orthosteric compounds
