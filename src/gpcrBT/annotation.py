@@ -1,6 +1,5 @@
 import os
 import json
-import timeit
 import metapub
 
 import pandas as pd
@@ -29,14 +28,9 @@ def pmid2bibtex(doc_ids, fname):
     """
     
     doc_ids = df.doc_id.unique().tolist()
-    t_start = timeit.default_timer()
     fetch = metapub.PubMedFetcher()
     f = open(fname, 'w')
-    n = len(doc_ids)
-    for i, doc_id in enumerate(doc_ids):
-        t = timeit.default_timer() - t_start
-        t_left = t/(i+1) * (n-i)
-        print('{} - time left: {}s'.format(i, int(t_left)), end='\r')
+    for doc_id in tqdm(doc_ids):
         try:
             if doc_id.startswith('PMID:'):
                 doi = metapub.convert.pmid2doi(doc_id[5:])
