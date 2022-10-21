@@ -13,7 +13,7 @@ Script to annotate GPCRs bioactivity type based on parsing paper abstracts or PD
 
 Load annotation class: 
 
-    from gpcrBT import *
+    from bindtype import *
     annotate = BindingTypeAnnotation()
 
 Parse abstracts from a list of PMIDs:
@@ -23,17 +23,17 @@ Parse abstracts from a list of PMIDs:
 
 Parse abstracts from a .tsv file with PMIDs in `doc_id` columns and save to file .json-file:
 
-    annotate.parse_abstracts(from_file='data/pmids.tsv', out_file='binding_types.json')
+    annotate.parse_abstracts(from_file='pmids.tsv', out_file='binding_types.json')
 
 Parse PDFs (named PMID:XXXXXX.pdf) in a folder:
-    binding_type = annotate.parse_pdfs(input_folder='data/PDFs')
+    binding_type = annotate.parse_pdfs(input_folder='PDF_folder')
 
 
 ## Class A binding type prediction
 
 Script to predict binary binding type (allo- or orthosteric) of molecule targeting a class A GPCR.
 
-    preds = predictor = BindingTypeClassifier('data/input.tsv')
+    preds = predictor = BindingTypeClassifier('input.tsv')
 
 with `input.tsv` with columns `SMILES` and `accession` containing molecule protein pairs.
 
