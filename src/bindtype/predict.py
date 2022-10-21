@@ -4,7 +4,7 @@ import sklearn_json as skljson
 
 from .descriptors import getDescriptors
 
-def BindingTypeClassifier(data = None, data_path : str = None, output_path : str = None):
+def BindingTypeClassifier(data = None, data_path : str = None, output_path : str = None, smiles_column : str = 'SMILES'):
     """Predict binding type (allo- or orthosteric) of given molecule-protein pairs."""
 
     if data_path:
@@ -13,7 +13,7 @@ def BindingTypeClassifier(data = None, data_path : str = None, output_path : str
         raise ValueError('No data provided. Provide either data or data_path')
     
     # Get descriptors
-    pairs = [ (smiles, target) for smiles, target in zip(data['canonical_smiles'], data['accession']) ]
+    pairs = [ (smiles, target) for smiles, target in zip(data[smiles_column], data['accession']) ]
     x = getDescriptors(
         pairs, 
         scaler_from_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/proteinDesciptorScaler.json'),
