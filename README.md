@@ -31,6 +31,8 @@ Parse PDFs (named PMID:XXXXXX.pdf) in a folder:
 
 ## Class A binding type prediction
 
+:warning: The training data is extremely unbalanced (only 24/200 targets have both allo- and orthosteric data points  !!!
+
 Script to predict binary binding type (allo- or orthosteric) of molecule targeting a class A GPCR.
 
     preds = predictor = BindingTypeClassifier('input.tsv')
