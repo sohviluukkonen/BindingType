@@ -1,113 +1,223 @@
 import os
 import json
-import metapub
+import argparse
+import requests
 
-import pandas as pd
-
-from io import StringIO
+from bs4 import BeautifulSoup
 from tqdm.auto import tqdm
+from typing import List, Dict
 
 from Bio import Entrez
 from Bio.Entrez import efetch
 Entrez.email = 'A.N.Other@example.com'
 
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.pdfpage import PDFPage
-from pdfminer.pdfparser import PDFParser
-    
-def pmid2bibtex(doc_ids, fname):
-    
-    """ Writes a .bib file from document identification (PMID) in a DataFrame 
-    
-    Parameters:
-        doc_ids (lst) : list of PMID document IDs
-        fname (str) : name of ouput .bib file
-    """
-    
-    doc_ids = df.doc_id.unique().tolist()
-    fetch = metapub.PubMedFetcher()
-    f = open(fname, 'w')
-    for doc_id in tqdm(doc_ids):
-        try:
-            if doc_id.startswith('PMID:'):
-                doi = metapub.convert.pmid2doi(doc_id[5:])
-                article = fetch.article_by_pmid(doc_id[5:])
-                f.write('@article{' + doc_id + ',\n')
-                f.write('\tdoi={' + doi + '},\n')
-                f.write('\ttitle={' + article.title + '},\n')
-                f.write('\tauthor={' + ', '.join(article.authors) + '},\n')
-                f.write('\tyear={' + article.year + '},\n')
-                f.write('\tjournal={' + article.journal + '},\n')
-                f.write('\tabstract={' + doc_id + '},\n')
-                f.write('}\n')
-        except:
-            # If doc_id is not a PMID, pass 
-            print(doc_id)
-    f.close()
+from chembl_webresource_client.new_client import new_client
+
 
 class BindingTypeAnnotation():
     
-    """ Annotate binding type of a GPCR publications by parsing abstracts or PDFs for hierarchy of keywords """
+    """ Annotate binding type of a based on keywords in abstracts or assay descriptions """
 
-    def abstract_parser(self, document_ids : list = None, input_file : str = None, output_file : str = None):
+    def __init__(self):
+        self.documents = {}
+        self.assays = {}
 
-        """ Parse abstracts for binding type keywords
+    def retrieve_abstracts_from_PubMed(self):
+
+        """ Retrieve abstracts from PubMed using document IDs (PMID) """
+
+        pmids = [doc_id for doc_id in self.document_ids if doc_id.startswith('PMID:')]
+                 
+        if len(pmids) == 0:
+            print('No PubMed IDs provided. Parsing PubMed will be skipped.')
+        else:
+            for pmid in tqdm(pmids, desc='Parsing PubMed'):
+                try:
+                    handle = efetch(db='pubmed', id=self.pmid[5:], retmode='text', rettype='abstract')
+                    self.documents[pmid] = handle.read().lower()
+                except:
+                    print('Could not retrieve abstract for {}'.format(pmid))
+
+    def retrieve_descriptions_from_PubChem(self):
+
+        """ Retrieve assay descriptions from PubChem using document IDs (PubChemAID) """
+
+        aids = [doc_id for doc_id in self.document_ids if doc_id.startswith('PubChemAID:')]
+                 
+        if len(aids) == 0:
+            print('No PubChemAID IDs provided. Parsing PubChem will be skipped.')
+        else:
+            for aid in tqdm(aids, desc='Parsing PubChem'):
+                try:
+                    handle = efetch(db='pcassay', id=self.aid[11:], retmode='text', rettype='abstract')
+                    self.documents[aid] = handle.read().lower()
+                except:
+                    print('Could not retrieve description for {}'.format(aid))
+
+    def retrieve_abstracts_from_CrossRef(self):
+
+        """ Retrieve abstracts from CrossRef using document IDs (DOI) """
+
+        dois = [doc_id for doc_id in self.document_ids if doc_id.startswith('DOI:')]
+                 
+        if len(dois) == 0:
+            print('No DOI IDs provided. Parsing CrossRef will be skipped.')
+        else:
+            for doi in tqdm(dois, desc='Parsing CrossRef'):
+                try:
+                    url = f'https://api.crossref.org/works/{doi[4:]}'
+                    r = requests.get(url)
+                    crossref = r.json()
+                    self.documents[doi] = crossref['message']['abstract'].lower()
+                except:
+                    print('Could not retrieve abstract for {}'.format(doi))
+                
+    def retrieve_abstracts_from_GooglePatents(self):
+
+        """ Retrieve abstracts from Google Patents using document IDs (Patent number) """
+
+        patents = [doc_id for doc_id in self.document_ids if doc_id.startswith('PATENT:')]
+                 
+        if len(patents) == 0:
+            print('No patent IDs provided. Parsing Google Patents will be skipped.')
+        else:
+            for patent in tqdm(patents, desc='Parsing Google Patents'):
+                try:
+                    url = f'https://patents.google.com/patent/{patent[7:]}/en'
+                    r = requests.get(url)
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    meta = soup.find_all("meta")
+
+                    for m in meta:
+                        if m.get("name") == "description":
+                           self.documents[patent] = m.get("content").lower()
+                           break
+                except:
+                    print('Could not retrieve abstract for {}'.format(patent))
+
+
+    def retrieve_description_from_ChEMBL(self):
+
+        """ Retrieve assay description from ChEMBL using document IDs (ChEMBL ID) """
+
+        chembl_aids = [assay_id for assay_id in self.assay_ids if assay_id.startswith('CHEMBL:')]
+                 
+        if len(chembl_aids) == 0:
+            print('No ChEMBL IDs provided. Parsing ChEMBL will be skipped.')
+        else:
+            chembl_assays = new_client.assay
+            descriptions = chembl_assays.filter(assay_id__in=chembl_aids).only(['description'])
+            for chembl_aid, description in tqdm(zip(chembl_aids, descriptions), total=len(chembl_aids), desc='Parsing ChEMBL assay descriptions'):
+                description = description['description']
+                if description is not None:
+                    self.assays[chembl_aid] = description.lower()
+                else:
+                    print('Could not retrieve description for {}'.format(chembl_aid))
+
+    def run_in_parallel(self, *funcs):
+        """ Run functions in parallel """
+
+        from multiprocessing import Pool
+        from functools import partial
+
+        with Pool() as p:
+            p.map(partial(funcs))
+
+    def drop_unknowns(self, d : Dict) -> Dict:
+        """ Drop unknown binding types """
+
+        return {k: v for k, v in d.items() if v != 'Unknown'}
+    
+    def __call__(self, document_ids: List[str] = None, assay_ids: List[str] = None, out_prefix: str = None, keep_unknowns: bool = False):
+
+        if document_ids is None and assay_ids is None:
+            raise ValueError('Provide either document IDs or ChEMBL assay IDs.')
+
+        if document_ids:
+            self.document_ids = document_ids
+
+            self.retrieve_abstracts_from_PubMed()
+            self.retrieve_abstracts_from_CrossRef()
+            self.retrieve_abstracts_from_GooglePatents()
+            self.retrieve_descriptions_from_PubChem()
+
+            document_binding_types = {}
+            for doc_id, text in self.documents.items():
+                document_binding_types[doc_id] = self.annotate(text)
+
+            if not keep_unknowns:
+                document_binding_types = self.drop_unknowns(document_binding_types)
+
+            if out_prefix is not None:
+                with open(out_prefix + '_docs.json', 'w') as f:
+                    json.dump(document_binding_types, f)
         
-        Parameters:
-            document_ids (list of str) : list of document IDs (PMID)
-            input_file (str) : path to input file
-            output_file (str) : path to output file
+        if assay_ids:
+            self.assay_ids = assay_ids
+
+            self.retrieve_description_from_ChEMBL()
+
+            assay_binding_types = {}
+            for assay_id, text in self.assays.items():
+                assay_binding_types[assay_id] = self.annotate(text)
+
+            if not keep_unknowns:
+                assay_binding_types = self.drop_unknowns(assay_binding_types)
+
+            if out_prefix is not None:
+                with open(out_prefix + '_assays.json', 'w') as f:
+                    json.dump(assay_binding_types, f)
+
+        if document_ids and assay_ids:
+            return document_binding_types, assay_binding_types
+        elif document_ids:
+            return document_binding_types
+        elif assay_ids:
+            return assay_binding_types
+
+
+class Kinase_AllostericAnnotation(BindingTypeAnnotation):
+
+    """ Annotate binding type of kinases based on keywords in abstracts or assay descriptions """
+
+    def __init__(self):
+        super(Kinase_AllostericAnnotation).__init__()
+        self.annotate = self.annotate_allosteric
+
+    def annotate_allosteric(self, text: str) -> str:
+
+        """ Annotate binding type of kinases based on keywords in abstracts or assay descriptions
+
+        Parameters
+        ----------
+        text : str
+            Abstract or assay description
+
+        Returns
+        -------
+        str
+            Binding type
         """
-        
-        if input_file is not None:
-            document_ids = pd.read_csv(input_file, sep='\t').doc_id.unique().tolist()
-        elif document_ids is None:
-            raise ValueError('No document IDs provided. Provide either a list of document IDs or a path to a file containing document IDs.')
 
-        # Get, parse and annotate abstracts
-        dct_binding_types = {}
-        for pmid in tqdm(document_ids, desc='Parsing abstracts'):
-            try :
-                handle = efetch(db='pubmed', id=pmid[5:], retmode='text', rettype='abstract')
-                abstract = handle.read().lower()
-                dct_binding_types[pmid] = self.hierarchichal_binding_site_attribution(abstract)
-            except:
-                print('Could parse {}'.format(pmid))
+        text = text.lower()
 
-        # Write to file
-        if output_file is not None:
-            with open(output_file, 'w') as f: json.dump(dct_binding_types, f)
-        
-        return dct_binding_types
+        keywords = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Kinase_allosteric_keywords.json'), 'r'))
+        for k, v in keywords.items(): keywords[k] = [item.lower() for item in v]
 
-    def pdf_parser(self, input_folder : str = None, output_file : str = None):
+        if any([keyword in text for keyword in keywords]):
+            return 'Allosteric'
+        else:
+            return 'Unknown'
 
-        """ Parse PDFs for binding type keywords
-        
-        Parameters:
-            input_folder (str) : path to input folder
-            output_file (str) : path to output file
-        """
-        
-        if input_folder is None:
-            raise ValueError('No input folder provided. Provide a path to a folder containing PDFs.')
-        files = [f for f in os.listdir(input_folder) if f.endswith('.pdf')]
 
-        # Get, parse and annotate PDFs
-        dct_binding_types = {}
-        for pmid in tqdm(os.listdir(files), desc='Parsing PDFs'):
-            text = self.convert_pdf_to_string(os.path.join(input_folder, fname))
-            text = text.lower().split("references",1)[0]
-            dct_binding_types[pmid] = self.hierarchichal_binding_site_attribution(text)
-        
-        # Write to file
-        if output_file is not None:
-            with open(output_file, 'w') as f: json.dump(dct_binding_types, f)
-        
-        return dct_binding_types
+class ClassA_GPCR_HierachicalBindingTypeAnnotation(BindingTypeAnnotation):
+    
+    """ Annotate binding type of Class A GPCR ligands based on hierarchical keywords in abstracts or assay descriptions """
+
+    def __init__(self):
+        super(ClassA_GPCR_HierachicalBindingTypeAnnotation).__init__()
+        self.annotate = self.hierarchichal_binding_site_attribution
+
 
     def hierarchichal_binding_site_attribution(self, text):
         
@@ -123,7 +233,7 @@ class BindingTypeAnnotation():
         site = None
 
         # Load keywords
-        keywords = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keywords.json'), 'r'))
+        keywords = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ClassA_GPCR_hierarchical_keywords.json'), 'r'))
         for k, v in keywords.items(): keywords[k] = [item.lower() for item in v]
         
         if any(item in text for item in keywords['Bitopic']): # Check if ligand binds to both sites
@@ -188,26 +298,7 @@ class BindingTypeAnnotation():
         for item in lst2: count2 += text.count(item)
         if count1 > count2: return 0
         elif count1 < count2: return 1
-        else: return 2
+        else: return 2    
 
-    def convert_pdf_to_string(self, file_path):
-        
-        """ Converts a PDF file to string
-        
-        Parameters:
-            file_path (str): path to PDF file
-        Returns:
-            (str) : str containing text from PDF"""
 
-        output_string = StringIO()
-        with open(file_path, 'rb') as in_file:
-            parser = PDFParser(in_file)
-            doc = PDFDocument(parser)
-            rsrcmgr = PDFResourceManager()
-            device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
-            interpreter = PDFPageInterpreter(rsrcmgr, device)
-            for page in PDFPage.create_pages(doc):
-                interpreter.process_page(page)
 
-        return(output_string.getvalue())
-    
