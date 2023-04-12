@@ -5,7 +5,7 @@ Scripts to annotate GPCR bioactivity binding types and to predict Class A GPCRs 
 
 ## Install
 
-    pip install git+https://github.com/sohviluukkonen/BindingType.git@master
+    pip install git+https://github.com/sohviluukkonen/BindingType.git@main
 
 ## Binding type annotation
 
