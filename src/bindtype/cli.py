@@ -1,5 +1,5 @@
 import argparse
-
+import pandas as pd
 from .annotation import ClassA_GPCR_HierachicalBindingTypeAnnotation, Kinase_AllostericAnnotation
 from .papyrus import add_binding_type_to_papyrus
 
@@ -18,8 +18,25 @@ def bindtype_cli_json():
     parser.add_argument('--keep_unknowns', action='store_true', help='Keep unknown binding types')
     args = parser.parse_args()
 
+
     if args.document_ids_path is None and args.assay_ids_path is None:
         raise ValueError('File with either document IDs or assay IDs must be provided')
+    
+    if args.document_ids_path:
+        # Text file with document IDs (PMID, PubChemAID, DOI, PATENT)
+        document_ids = []
+        with open(args.document_ids_path, 'r') as f:
+            for line in f:
+                document_ids.append(line.strip())
+        document_ids = list(set(document_ids))
+
+    if args.assay_ids_path:
+        # Text file with assay IDs (ChEMBL ID)
+        assay_ids = []
+        with open(args.assay_ids_path, 'r') as f:
+            for line in f:
+                assay_ids.append(line.strip())
+        assay_ids = list(set(assay_ids))
     
     if args.target_type == 'GPCR':
         parser = ClassA_GPCR_HierachicalBindingTypeAnnotation()
@@ -29,11 +46,11 @@ def bindtype_cli_json():
         raise ValueError('Target type must be either "GPCR" or "Kinase"')
     
     if args.document_ids_path and args.assay_ids_path:
-        _, _ = parser(document_ids_path=args.document_ids_path, assay_ids_path=args.assay_ids_path, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
+        _, _ = parser(document_ids=document_ids, assay_ids=args.assay_ids, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
     elif args.document_ids_path:
-        _ = parser(document_ids_path=args.document_ids_path, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
+        _ = parser(document_ids=document_ids, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
     elif args.assay_ids_path:
-        _ = parser(assay_ids_path=args.assay_ids_path, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
+        _ = parser(assay_ids=assay_ids, out_prefix=args.out_prefix, keep_unknowns=args.keep_unknowns)
 
 def bindtype_cli_papyrus():
 
@@ -52,7 +69,7 @@ def bindtype_cli_papyrus():
     parser.add_argument('-o', '--output', type=str, required=False, help='File to save Papyrus data with binding type')
     parser.add_argument('-t', '--target_type', type=str, required=False, default='GPCR', help='Target type (GPCR or Kinase)')
     parser.add_argument('-s', '--sources', type=str, required=False, default='both', help='Sources to use for annotation (abstracts, assays, both)')
-    parser.add_argument('-sim', '--similarity', type=bool, required=False, default=False, help='Use similarity to annotate compounds')
+    parser.add_argument('-sim', '--similarity', action='store_true', required=False, help='Use similarity-based annotation')
     parser.add_argument('-sim_th', '--similarity_threshold', type=float, required=False, default=0.8, help='Similarity threshold')
     args = parser.parse_args()
 

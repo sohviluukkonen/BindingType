@@ -33,7 +33,7 @@ class BindingTypeAnnotation():
         else:
             for pmid in tqdm(pmids, desc='Parsing PubMed'):
                 try:
-                    handle = efetch(db='pubmed', id=self.pmid[5:], retmode='text', rettype='abstract')
+                    handle = efetch(db='pubmed', id=pmid[5:], retmode='text', rettype='abstract')
                     self.documents[pmid] = handle.read().lower()
                 except:
                     print('Could not retrieve abstract for {}'.format(pmid))
@@ -49,7 +49,7 @@ class BindingTypeAnnotation():
         else:
             for aid in tqdm(aids, desc='Parsing PubChem'):
                 try:
-                    handle = efetch(db='pcassay', id=self.aid[11:], retmode='text', rettype='abstract')
+                    handle = efetch(db='pcassay', id=aid[11:], retmode='text', rettype='abstract')
                     self.documents[aid] = handle.read().lower()
                 except:
                     print('Could not retrieve description for {}'.format(aid))
@@ -100,7 +100,7 @@ class BindingTypeAnnotation():
 
         """ Retrieve assay description from ChEMBL using document IDs (ChEMBL ID) """
 
-        chembl_aids = [assay_id for assay_id in self.assay_ids if assay_id.startswith('CHEMBL:')]
+        chembl_aids = [assay_id for assay_id in self.assay_ids if assay_id.startswith('CHEMBL')]
                  
         if len(chembl_aids) == 0:
             print('No ChEMBL IDs provided. Parsing ChEMBL will be skipped.')
@@ -181,7 +181,7 @@ class Kinase_AllostericAnnotation(BindingTypeAnnotation):
     """ Annotate binding type of kinases based on keywords in abstracts or assay descriptions """
 
     def __init__(self):
-        super(Kinase_AllostericAnnotation).__init__()
+        super().__init__()
         self.annotate = self.annotate_allosteric
 
     def annotate_allosteric(self, text: str) -> str:
@@ -201,7 +201,8 @@ class Kinase_AllostericAnnotation(BindingTypeAnnotation):
 
         text = text.lower()
 
-        keywords = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Kinase_allosteric_keywords.json'), 'r'))
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Kinase_allosteric_keywords.json'), 'r') as f:
+            keywords = json.load(f)
         for k, v in keywords.items(): keywords[k] = [item.lower() for item in v]
 
         if any([keyword in text for keyword in keywords]):
@@ -215,7 +216,7 @@ class ClassA_GPCR_HierachicalBindingTypeAnnotation(BindingTypeAnnotation):
     """ Annotate binding type of Class A GPCR ligands based on hierarchical keywords in abstracts or assay descriptions """
 
     def __init__(self):
-        super(ClassA_GPCR_HierachicalBindingTypeAnnotation).__init__()
+        super().__init__()
         self.annotate = self.hierarchichal_binding_site_attribution
 
 
@@ -233,7 +234,8 @@ class ClassA_GPCR_HierachicalBindingTypeAnnotation(BindingTypeAnnotation):
         site = None
 
         # Load keywords
-        keywords = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ClassA_GPCR_hierarchical_keywords.json'), 'r'))
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ClassA_GPCR_hierarchical_keywords.json'), 'r') as f:
+            keywords = json.load(f)
         for k, v in keywords.items(): keywords[k] = [item.lower() for item in v]
         
         if any(item in text for item in keywords['Bitopic']): # Check if ligand binds to both sites

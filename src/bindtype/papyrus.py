@@ -8,7 +8,7 @@ from rdkit.Chem import AllChem
 
 from .annotation import ClassA_GPCR_HierachicalBindingTypeAnnotation, Kinase_AllostericAnnotation
 
-def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', sources : str = 'both', similarity : bool = True, similarity_th : float = 0.8) -> pd.DataFrame:
+def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', sources : str = 'both', similarity : bool = False, similarity_th : float = 0.8) -> pd.DataFrame:
     
     """
     Add binding type to Papyrus data frame
@@ -43,6 +43,7 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
                 if doc_id.startswith('PMID') or doc_id.startswith('PubChemAID') or doc_id.startswith('DOI') or doc_id.startswith('PATENT'):
                     document_ids.append(doc_id)
         document_ids = list(set(document_ids))
+        print('Number of documents:', len(document_ids))
 
     if sources == 'both' or sources == 'assays':
         chembl_assay_ids = []
@@ -51,6 +52,7 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
                 if aid.startswith('CHEMBL'):
                     chembl_assay_ids.append(aid)
         chembl_assay_ids = list(set(chembl_assay_ids))
+        print('Number of ChEMBL assays:', len(chembl_assay_ids))
 
     # Get binding type by parsing documents and/or assays
     if target_type == 'GPCR':
@@ -59,7 +61,7 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
         parser = Kinase_AllostericAnnotation()
     else:
         raise ValueError('Unknown target type')
-    
+        
     if sources == 'abstracts':
         document_binding_types = parser(document_ids=document_ids)
         assay_binding_types = None
@@ -70,8 +72,10 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
         document_binding_types, assay_binding_types = parser(document_ids=document_ids, assay_ids=chembl_assay_ids)
 
     # Annotate compounds
-    binding_types = list(set( set(document_binding_types.values()) + set(assay_binding_types.values()) ))
+    binding_types = list( set(document_binding_types.values()) | set(assay_binding_types.values()) )
     df['BindingType'] = 'Unknown'
+
+    print(f'WARNING: If a compound has multiple binding type annotations, only the first one will be kept.')
     
     for binding_type in binding_types:
 
@@ -82,9 +86,8 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
             for ichikey, dids in zip(df.InChIKey, df.all_doc_ids):    
                 
                 if any(bd != 'Unknown' for bd in df[df.InChIKey == ichikey].BindingType):
-                    print('WARNING: Binding type already annotated for compound {}'.format(ichikey))
-                    print('WARNING: The first binding type will be kept and the others will be ignored')
                     continue
+                # TODO: implement majority vote
                 
                 for did in dids.split(';'):
                     if did not in document_binding_types.keys():
@@ -97,9 +100,8 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
             for ichikey, aids in zip(df.InChIKey, df.AID):    
                 
                 if any(bd != 'Unknown' for bd in df[df.InChIKey == ichikey].BindingType):
-                    print('WARNING: Binding type already annotated for compound {}'.format(ichikey))
-                    print('WARNING: The first binding type will be kept and the others will be ignored')
                     continue
+                # TODO: implement majority vote / ranking of sources
                 
                 for aid in aids.split(';'):
                     if aid not in assay_binding_types.keys():
@@ -116,6 +118,11 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
         annotated_smiles = df[df.BindingType != 'Unknown'].canonical_SMILES.unique()
         unannotated_smiles = df[df.BindingType == 'Unknown'].canonical_SMILES.unique()
 
+        if len(annotated_smiles) == 0:
+            print('WARNING: No annotated compounds found. Similarity annotation will be skipped')
+            df.drop('canonical_SMILES', axis=1, inplace=True)
+            return df
+
         # Get fingerprints
         fps_annotated = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smi), 3, nBits=2048) for smi in annotated_smiles]
         fps_unannotated = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(smi), 3, nBits=2048) for smi in unannotated_smiles]
@@ -131,5 +138,3 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
         df.drop('canonical_SMILES', axis=1, inplace=True)
 
     return df 
-  
-
