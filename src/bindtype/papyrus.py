@@ -18,7 +18,7 @@ def add_binding_type_to_papyrus(df : pd.DataFrame, target_type : str = 'GPCR', s
     df : pd.DataFrame
         Papyrus data frame
     target_type : str, optional
-        Target type: 'GPRC' or 'Kinase', by default 'GPCR'
+        Target type: 'GPCR' or 'Kinase', by default 'GPCR'
     sources : str, optional
         Binding type sources: 'abstracts' (PubMed, PubChem, CrossRef, Patents), 'assays' (ChEMBL) or 'both, by default 'both'
     similarity : bool, optional

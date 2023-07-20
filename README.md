@@ -28,7 +28,7 @@ bindtype_papyrus -i <dataset.csv/.tsv> -tt <GPCR/Kinase>
 or with the API with
 ```
 from bindtype.papyrus import add_binding_type_to_papyrus
-df = add_binding_type_to_papyrus(df, target_type=GPRC/Kinase)
+df = add_binding_type_to_papyrus(df, target_type=GPCR/Kinase)
 ```
 
 There is also an option to annotate all 'unknown' compounds that based on their Tanimoto similarity to the annotated compounds: `-sim, --similarity` flag in the CLI and `similarity=True` in the API.
